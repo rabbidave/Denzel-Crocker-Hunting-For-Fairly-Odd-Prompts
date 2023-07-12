@@ -25,7 +25,7 @@ The ROUGE-L value is calculated intially from the baseline, and stored in memory
 
 The cosine similarity is used as a heuristic to detect similarity of inputs from incoming dataframes with known bad prompts (ostensibly to identify prompt injection), and the ROUGE-L score is used to more precisely compare the inputs with a baseline dataset of known good prompts; as a means of validating the assumption of the first function. 
 
-Based on the resultant calculations messages are routed to the appropriate SQS bus.
+Based on the resultant calculations messages are routed to the appropriate SQS bus. Makes use of an open-source good/bad prompt dataset [available on huggingface](https://huggingface.co/datasets/JasperLS/prompt-injections)
 
 #
 ### Note: Needs logging and additional error-handling; this is mostly conceptual and assumes the use of environment variables rather than hard-coded values for cosine similarity & ROUGE-L
