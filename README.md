@@ -3,7 +3,7 @@
 #
 ## Utility 1) Denzel Crocker: Serverless & Event Driven inspection of messages for Prompt Injection; for use with Language Models
 
-<img src="https://static.wikia.nocookie.net/fairlyoddparents/images/3/3a/Denzel_Crocker_scheming.png/revision/latest?cb=20220920232347&path-prefix=en" alt="Denzel Crocker" title="Denzel Crocker" width="10%">
+<img src="https://static.wikia.nocookie.net/fairlyoddparents/images/3/3a/Denzel_Crocker_scheming.png/revision/latest?cb=20220920232347&path-prefix=en" alt="Denzel Crocker" title="Denzel Crocker" width="40%">
 
 ## Description:
 A set of serverless functions designed to assist in the monitoring of inputs to language models, specifically inspection of messages for prompt injection and subsequent routing of messages to the appropriate SQS bus
