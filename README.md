@@ -1,7 +1,7 @@
 ## ♫ The Dream of the 90's ♫ is alive in ~~Portland~~ ["a weird suite of Enterprise LLM tools"](https://github.com/users/rabbidave/projects/1) named after [Nicktoons](https://en.wikipedia.org/wiki/Nicktoons)
 ### by [some dude in his 30s](https://www.linkedin.com/in/davidisaacpierce)
 #
-## Utility 1) Denzel Crocker: Serverless & Event Driven inspection of messages for Prompt Injection; for use with Language Models
+## Utility 3) Denzel Crocker: Serverless & Event Driven inspection of messages for Prompt Injection; for use with Language Models
 
 <img src="https://static.wikia.nocookie.net/fairlyoddparents/images/3/3a/Denzel_Crocker_scheming.png/revision/latest?cb=20220920232347&path-prefix=en" alt="Denzel Crocker" title="Denzel Crocker" width="40%">
 
