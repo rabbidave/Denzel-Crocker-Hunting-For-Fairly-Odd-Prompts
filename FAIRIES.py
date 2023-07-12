@@ -1,3 +1,7 @@
+# My thanks to the open-source community; LLMs brought about a GNU revival
+# My thanks to Arize AI in particular; y'all inspired this and other utilities with an awesome observability platform & sessions
+# Note: This Lambda has a timeout to ensure it's spun down gracefully; manage your Lambda with Provisioned Concurrency to ensure SQS messages don't get missed
+
 import pandas as pd
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -37,10 +41,13 @@ acceptable_prompts_df = pd.read_parquet(obj['Body'])
 scorer = rouge_scorer.RougeScorer(['rougeL'], use_stemmer=True)
 acceptable_prompts_rougeL_scores = acceptable_prompts_df.apply(lambda row: scorer.score(row['summary'], acceptable_prompts_df['reference_summary'])['rougeL'].fmeasure, axis=1)
 
-def compute_cosine_similarity(df: pd.DataFrame, baseline_df: pd.DataFrame) -> float:
-    vectorizer = TfidfVectorizer()
+# Calculates the baseline vector once; stores in memory for use against each new incoming message
+baseline_vectorizer = TfidfVectorizer().fit(baseline_df['text'])
+baseline_tfidf_matrix = baseline_vectorizer.transform(baseline_df['text'])
+
+def compute_cosine_similarity(df: pd.DataFrame) -> float:
+    vectorizer = TfidfVectorizer(vocabulary=baseline_vectorizer.vocabulary_)
     tfidf_matrix = vectorizer.fit_transform(df['text'])
-    baseline_tfidf_matrix = vectorizer.transform(baseline_df['text'])
     cosine_sim = cosine_similarity(tfidf_matrix, baseline_tfidf_matrix)
     return cosine_sim.mean()
 
@@ -60,7 +67,7 @@ def send_message_to_sqs(df, queue_url):
         raise
 
 def process_data(df):
-    cosine_sim = compute_cosine_similarity(df, bad_prompts_df)
+    cosine_sim = compute_cosine_similarity(df)
     if cosine_sim >= COSINE_SIMILARITY_THRESHOLD:
         df["rougeL_score"] = compute_rougeL_scores(df, acceptable_prompts_df)
         if df['rougeL_score'].mean() < ROUGE_L_THRESHOLD:
@@ -82,7 +89,13 @@ def receive_message():
     return response
 
 def lambda_handler(event, context):
+    start_time = time.time()
+
     while True:
+        # Check if 10 minutes have passed
+        if time.time() - start_time > 600:
+            break
+
         try:
             response = receive_message()
 
@@ -102,13 +115,13 @@ def lambda_handler(event, context):
                             ReceiptHandle=receipt_handle
                         )
                     except Exception as e:
-                        print(f"Error processing message: {e}")
+                        print(f'Error processing message: {e}')
                         raise
             else:
                 # No more messages in the queue, terminate the function
                 break
         except ClientError as e:
-            print(f"Error receiving message: {e}")
+            print(f'Error receiving message: {e}')
             time.sleep(2**RETRY_COUNT)  # Exponential backoff
             RETRY_COUNT -= 1
             if RETRY_COUNT == 0:
