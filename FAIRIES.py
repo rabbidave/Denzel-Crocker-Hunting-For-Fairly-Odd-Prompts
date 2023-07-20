@@ -12,6 +12,8 @@ import json
 import os
 from botocore.exceptions import ClientError
 import datetime
+import logging
+import random
 
 # Define constants
 COSINE_SIMILARITY_THRESHOLD = 0.8
@@ -29,13 +31,24 @@ RETRY_COUNT = 3  # Define a suitable retry count
 s3 = boto3.client('s3')
 sqs = boto3.client('sqs')
 
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+
 # Load the bad prompts DataFrame from S3
-obj = s3.get_object(Bucket=S3_BUCKET_NAME, Key=BAD_PROMPTS_FILE_KEY)
-bad_prompts_df = pd.read_parquet(obj['Body'])
+try:
+    obj = s3.get_object(Bucket=S3_BUCKET_NAME, Key=BAD_PROMPTS_FILE_KEY)
+    bad_prompts_df = pd.read_parquet(obj['Body'])
+except ClientError as e:
+    logging.error(f'Error loading bad prompts: {e}', exc_info=True)
+    raise
 
 # Load the acceptable prompts DataFrame from S3
-obj = s3.get_object(Bucket=S3_BUCKET_NAME, Key=ACCEPTABLE_PROMPTS_FILE_KEY)
-acceptable_prompts_df = pd.read_parquet(obj['Body'])
+try:
+    obj = s3.get_object(Bucket=S3_BUCKET_NAME, Key=ACCEPTABLE_PROMPTS_FILE_KEY)
+    acceptable_prompts_df = pd.read_parquet(obj['Body'])
+except ClientError as e:
+    logging.error(f'Error loading acceptable prompts: {e}', exc_info=True)
+    raise
 
 # Compute Rouge-L scores for the acceptable prompts dataframe once and reuse the result
 scorer = rouge_scorer.RougeScorer(['rougeL'], use_stemmer=True)
@@ -63,7 +76,7 @@ def send_message_to_sqs(df, queue_url):
         }
         sqs.send_message(**message)
     except Exception as e:
-        print(f"Error sending message: {e}")
+        logging.error(f"Error sending message: {e}", exc_info=True)
         raise
 
 def process_data(df):
@@ -78,14 +91,21 @@ def process_data(df):
         send_message_to_sqs(df, SAFE_SQS_QUEUE_URL)
 
 def receive_message():
-    response = sqs.receive_message(
-        QueueUrl=SQS_QUEUE_URL,
-        AttributeNames=['All'],
-        MaxNumberOfMessages=10,
-        MessageAttributeNames=['All'],
-        VisibilityTimeout=60,
-        WaitTimeSeconds=20
-    )
+    try:
+        response = sqs.receive_message(
+            QueueUrl=SQS_QUEUE_URL,
+            AttributeNames=['All'],
+            MaxNumberOfMessages=10,
+            MessageAttributeNames=['All'],
+            VisibilityTimeout=60,
+            WaitTimeSeconds=20
+        )
+    except ClientError as e:
+        logging.error(f'Error receiving message: {e}', exc_info=True)
+        time.sleep((2 ** RETRY_COUNT) + random.uniform(0, 1))  # Exponential backoff
+        RETRY_COUNT -= 1
+        if RETRY_COUNT == 0:
+            raise
     return response
 
 def lambda_handler(event, context):
@@ -115,14 +135,14 @@ def lambda_handler(event, context):
                             ReceiptHandle=receipt_handle
                         )
                     except Exception as e:
-                        print(f'Error processing message: {e}')
+                        logging.error(f'Error processing message: {e}', exc_info=True)
                         raise
             else:
                 # No more messages in the queue, terminate the function
                 break
         except ClientError as e:
-            print(f'Error receiving message: {e}')
-            time.sleep(2**RETRY_COUNT)  # Exponential backoff
+            logging.error(f'Error receiving message: {e}', exc_info=True)
+            time.sleep((2 ** RETRY_COUNT) + random.uniform(0, 1))  # Exponential backoff
             RETRY_COUNT -= 1
             if RETRY_COUNT == 0:
                 raise
